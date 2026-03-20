@@ -3,3 +3,4 @@ node_modules/
 *.log
 .DS_Store
 temp_commits.txt
+temp_commits_prompt.txt
