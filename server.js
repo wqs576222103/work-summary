@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const simpleGit = require('simple-git');
 const Anthropic = require('@anthropic-ai/sdk');
+const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
@@ -22,6 +23,21 @@ const anthropic = new Anthropic({
 
 // Store git username cache
 const gitUsernameCache = new Map();
+
+
+const str2Arr = (str, defaultValue = []) => {
+  let arr = []
+  if (str) {
+    if (Array.isArray(str)) {
+      arr = str
+    } else {
+      arr = str.split(',').map(b => b.trim());
+    }
+  } else {
+    arr = defaultValue
+  }
+  return arr
+}
 
 /**
  * Find all git repositories in a directory
@@ -119,15 +135,6 @@ async function getRepoCommits(repoPath, branches, startDate, endDate, username) 
   const commits = [];
 
   try {
-    // Default branches if not specified
-    if (!branches || branches.length === 0) {
-      branches = ['alpha', 'dev'];
-    }
-
-    // Convert single branch to array
-    if (typeof branches === 'string') {
-      branches = [branches];
-    }
 
     if (!username) {
       username = await getGitUsername(repoPath);
@@ -197,34 +204,36 @@ async function getRepoCommits(repoPath, branches, startDate, endDate, username) 
  * @param {string} content - Commit content to summarize
  * @returns {Promise<string>} - Generated summary
  */
-async function generateSummary(content) {
+async function generateSummary(promptText) {
   try {
-    const response = await anthropic.messages.create({
-      // model: "claude-opus-4-6",
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
-      messages: [{
-        role: "user",
-        content: `请根据以下 Git 提交记录生成工作总结，按照以下格式输出：
+    // console.log(process.env.ANTHROPIC_API_URL, process.env.ANTHROPIC_API_KEY);
+    // Prepare the request to Claude API
+    const claudeResponse = await axios.post(
+      process.env.ANTHROPIC_API_URL,
+      {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        messages: [
+          {
+            role: 'user',
+            content: promptText
+          }
+        ]
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        }
+      }
+    );
 
-日期：${new Date().toISOString().split('T')[0]}~${new Date().toISOString().split('T')[0]}
-1. 重点工作完成情况
-    1.1 项目 1
-        变更描述
-    1.2 项目 2
-        变更描述
-        ......
-
-提交记录内容：
-${content}`
-      }]
-    });
-
-    return response.content[0].text;
-  } catch (err) {
-    console.error('Error generating summary:', err.message);
+    return claudeResponse.content[0].text;
+  } catch (error) {
+    console.error('Error calling Claude API:', error.response?.data || error.message);
     // console.log('Content:', content);
-    throw err
+    throw error
   }
 }
 
@@ -241,14 +250,20 @@ app.post('/api/scan', async (req, res) => {
       return res.status(400).json({ error: 'Directory path is required' });
     }
 
-    // Normalize path for Windows
-    const normalizedPath = path.normalize(dirPath);
+    const dirPaths = str2Arr(dirPath, []);
+    const repos = []
 
-    if (!fs.existsSync(normalizedPath)) {
-      return res.status(400).json({ error: 'Directory does not exist' });
+    for (const _dirPath of dirPaths) {
+      // Normalize path for Windows
+      const normalizedPath = path.normalize(_dirPath);
+
+      if (!fs.existsSync(normalizedPath)) {
+        return res.status(400).json({ error: 'Directory does not exist' });
+      }
+
+      const repoList = await findGitRepos(normalizedPath);
+      repos.push(...repoList);
     }
-
-    const repos = await findGitRepos(normalizedPath);
     res.json({ repos });
   } catch (err) {
     console.error('Error scanning directory:', err.message);
@@ -275,55 +290,50 @@ app.post('/api/username', async (req, res) => {
   }
 });
 
-/**
- * Process repositories and generate summary
- */
-app.post('/api/generate', async (req, res) => {
-  try {
-    const { repos, branch, branches, startDate, endDate, username } = req.body;
+const getPromptText = async (req) => {
+  const { repos, branch, startDate, endDate, username } = req.body;
+  if (!repos || !startDate || !endDate) {
+    return res.status(400).json({ error: 'Missing required parameters' });
+  }
+  let branchesToProcess = str2Arr(branch, ['alpha', 'dev']);
 
-    if (!repos || !startDate || !endDate) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+  const allCommits = [];
+
+  // Collect commits from all repositories
+  for (const repoPath of repos) {
+    const repoName = path.basename(repoPath);
+    const commits = await getRepoCommits(repoPath, branchesToProcess, startDate, endDate, username);
+
+    if (commits.length > 0) {
+      allCommits.push({
+        repoName,
+        repoPath,
+        commits
+      });
     }
+  }
 
-    // Support both single branch (backward compatible) and multiple branches
-    const branchesToProcess = branches || (branch ? [branch] : null);
+  // Format commits into a text file content
+  let content = '';
+  for (const repo of allCommits) {
+    content += `\n=== ${repo.repoName} ===\n\n`;
 
-    const allCommits = [];
-
-    // Collect commits from all repositories
-    for (const repoPath of repos) {
-      const repoName = path.basename(repoPath);
-      const commits = await getRepoCommits(repoPath, branchesToProcess, startDate, endDate, username);
-
-      if (commits.length > 0) {
-        allCommits.push({
-          repoName,
-          repoPath,
-          commits
-        });
-      }
+    for (const commit of repo.commits) {
+      //   content += `Branch: ${commit.branch}\n`;
+      //   content += `Commit: ${commit.hash}\n`;
+      //   content += `Date: ${commit.date}\n`;
+      //   content += `Message: ${commit.message}\n`;
+      content += `Diff:\n${commit.diff}\n`;
     }
+  }
 
-    // Format commits into a text file content
-    let content = '';
-    for (const repo of allCommits) {
-      content += `\n=== ${repo.repoName} ===\n\n`;
+  // Save to temporary file
+  const tempFile = path.join(__dirname, 'temp_commits.txt');
+  const tempFilePrompt = path.join(__dirname, 'temp_commits_prompt.txt');
 
-      for (const commit of repo.commits) {
-        content += `Branch: ${commit.branch}\n`;
-        content += `Commit: ${commit.hash}\n`;
-        content += `Date: ${commit.date}\n`;
-        content += `Message: ${commit.message}\n`;
-        content += `Diff:\n${commit.diff}\n\n`;
-      }
-    }
 
-    // Save to temporary file
-    const tempFile = path.join(__dirname, 'temp_commits.txt');
-    const tempFilePrompt = path.join(__dirname, 'temp_commits_prompt.txt');
-    await fs.promises.writeFile(tempFile, content, 'utf-8');
-    await fs.promises.writeFile(tempFilePrompt, `请根据以下 Git 提交记录生成工作总结，按照以下格式输出：
+  await fs.promises.writeFile(tempFile, content, 'utf-8');
+  const promptText = `请根据以下 Git 提交记录生成工作总结，按照以下格式输出：
 日期：${startDate}~${endDate}
 1. 重点工作完成情况
     1.1 项目 1
@@ -331,15 +341,23 @@ app.post('/api/generate', async (req, res) => {
     1.2 项目 2
         变更描述
         ......
-
 提交记录内容：
-${content}`, 'utf-8');
+${content}`
+  await fs.promises.writeFile(tempFilePrompt, promptText, 'utf-8');
+  // Clean up temp file
+  await fs.promises.unlink(tempFile);
+  return promptText;
+}
 
+/**
+ * Process repositories and generate summary
+ */
+app.post('/api/generate', async (req, res) => {
+  let promptText = ''
+  try {
+    promptText = await getPromptText(req);
     // Generate summary using Claude
-    const summary = await generateSummary(content);
-
-    // Clean up temp file
-    await fs.promises.unlink(tempFile);
+    const summary = await generateSummary(promptText);
 
     res.json({
       summary,
@@ -347,8 +365,10 @@ ${content}`, 'utf-8');
     });
 
   } catch (err) {
+
     console.error('Error generating summary:', err.message);
-    res.status(500).json({ error: err.message });
+    const error = `${err.message}\n${promptText}`
+    res.status(500).json({ error });
   }
 });
 
