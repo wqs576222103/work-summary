@@ -15,12 +15,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Initialize Claude API client
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
-});
-
 // Store git username cache
 const gitUsernameCache = new Map();
 
@@ -211,7 +205,7 @@ async function generateSummary(promptText) {
     const claudeResponse = await axios.post(
       process.env.ANTHROPIC_API_URL,
       {
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-5-20251001', // 'claude-sonnet-4-20250514',
         max_tokens: 4096,
         messages: [
           {
@@ -229,7 +223,7 @@ async function generateSummary(promptText) {
       }
     );
 
-    return claudeResponse.content[0].text;
+    return claudeResponse.data.content[0].text;
   } catch (error) {
     console.error('Error calling Claude API:', error.response?.data || error.message);
     // console.log('Content:', content);
@@ -346,16 +340,17 @@ ${content}`
   await fs.promises.writeFile(tempFilePrompt, promptText, 'utf-8');
   // Clean up temp file
   await fs.promises.unlink(tempFile);
-  return promptText;
+  return {promptText, allCommits};
 }
 
 /**
  * Process repositories and generate summary
  */
 app.post('/api/generate', async (req, res) => {
-  let promptText = ''
+  let _promptText = ''
   try {
-    promptText = await getPromptText(req);
+    const { promptText, allCommits } = await getPromptText(req);
+    _promptText = promptText
     // Generate summary using Claude
     const summary = await generateSummary(promptText);
 
@@ -367,7 +362,7 @@ app.post('/api/generate', async (req, res) => {
   } catch (err) {
 
     console.error('Error generating summary:', err.message);
-    const error = `${err.message}\n${promptText}`
+    const error = `${err.message}\n${_promptText}`
     res.status(500).json({ error });
   }
 });
