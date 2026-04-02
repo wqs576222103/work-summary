@@ -149,7 +149,9 @@ router.post('/generate', async (req, res) => {
     _promptText = promptText;
 
     // Generate summary using Claude
-    const summary = await generateSummary(promptText);
+    // const summary = await generateSummary(promptText);
+    // 暂时不调用ai, 请复制以下提示词
+    const summary = promptText
 
     res.json({
       summary,

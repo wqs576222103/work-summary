@@ -121,7 +121,9 @@ async function getRepoCommits(repoPath, branches, startDate, endDate, username) 
         const log = await git.log([
           `--since=${startDate}`,
           `--until=${endDate} 23:59:59`,
-          `--author=${username}`
+          `--author=${username}`,
+          // 过滤掉merge commit
+          `--no-merges`,
         ]);
 
         for (const commit of log.all) {
