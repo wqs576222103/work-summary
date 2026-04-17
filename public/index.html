@@ -327,7 +327,7 @@
     function setDefaultDates() {
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 7);
+      startDate.setDate(startDate.getDate() - 6);
 
       document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
       document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
