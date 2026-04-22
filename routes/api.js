@@ -4,7 +4,8 @@ const path = require('path');
 const router = express.Router();
 
 const { findGitRepos, getGitUsername, getRepoCommits } = require('../services/gitService');
-const { generateSummary } = require('../services/aiService');
+// const { generateSummary } = require('../services/aiService');
+const { generateSummary } = require('../services/volcAiService');
 
 // Helper function to convert string to array
 const str2Arr = (str, defaultValue = []) => {
@@ -149,9 +150,9 @@ router.post('/generate', async (req, res) => {
     _promptText = promptText;
 
     // Generate summary using Claude
-    // const summary = await generateSummary(promptText);
+    const summary = await generateSummary(promptText);
     // 暂时不调用ai, 请复制以下提示词
-    const summary = promptText
+    // const summary = promptText
 
     res.json({
       summary,
