@@ -27,7 +27,7 @@ const str2Arr = (str, defaultValue = []) => {
  */
 const getPromptText = async (req) => {
   const { repos, branch, startDate, endDate, username } = req.body;
-  
+
   if (!repos || !startDate || !endDate) {
     throw new Error('Missing required parameters');
   }
@@ -59,13 +59,28 @@ const getPromptText = async (req) => {
     }
   }
 
+  // If content exceeds 50000 chars, rebuild with only commit messages (no diff)
+  if (content.length > 50000) {
+    console.log('Commit content exceeds 100000 chars, rebuilding with only commit messages');
+    content = '';
+    for (const repo of allCommits) {
+      content += `\n=== ${repo.repoName} ===\n\n`;
+
+      for (const commit of repo.commits) {
+        content += `Commit: ${commit.message}\n`;
+      }
+    }
+  } else {
+    console.log('Commit content is within 100000 chars, using full content');
+  }
+
   // Save to temporary files
   const tempFile = path.join(__dirname, '../temp_commits.txt');
   const tempFilePrompt = path.join(__dirname, '../temp_commits_prompt.txt');
 
   await fs.promises.writeFile(tempFile, content, 'utf-8');
-  
-  const promptText = `请根据以下 Git 提交记录生成工作总结，按照以下格式输出：
+
+  const promptText = `请根据以下 Git 提交记录生成工作总结,尽量简洁一点，按照以下格式输出：
 日期：${startDate}~${endDate}
 1. 重点工作完成情况
     1.1 项目 1
@@ -75,12 +90,12 @@ const getPromptText = async (req) => {
         ......
 提交记录内容：
 ${content}`;
-  
+
   await fs.promises.writeFile(tempFilePrompt, promptText, 'utf-8');
-  
+
   // Clean up temp file
   await fs.promises.unlink(tempFile);
-  
+
   return { promptText, allCommits };
 };
 
@@ -144,7 +159,7 @@ router.post('/username', async (req, res) => {
  */
 router.post('/generate', async (req, res) => {
   let _promptText = '';
-  
+
   try {
     const { promptText, allCommits } = await getPromptText(req);
     _promptText = promptText;
