@@ -3,15 +3,15 @@ const axios = require('axios');
 /**
  * Call Volcengine Ark AI API with streaming support
  * @param {string} apiKey - Volcengine ARK API key
- * @param {string} model - Model name (default: deepseek-v3-2-251201)
+ * @param {string} model - Model name (default: deepseek-v4-flash-260425)
  * @param {Array} messages - Array of message objects with role and content
  * @param {Object} options - Optional configuration (tools, stream, etc.)
  * @returns {Promise<string>} - Generated response text
  */
-async function callVolcengineAI(apiKey, model = 'deepseek-v3-2-251201', messages, options = {}) {
+async function callVolcengineAI(apiKey, model = 'deepseek-v4-flash-260425', messages, options = {}) {
   try {
     const baseUrl = process.env.VOLCENGINE_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3';
-    
+
     // Prepare input format from messages
     const input = messages.map(msg => ({
       role: msg.role,
@@ -68,12 +68,12 @@ async function callVolcengineAI(apiKey, model = 'deepseek-v3-2-251201', messages
 async function handleStreamingResponse(response) {
   return new Promise((resolve, reject) => {
     let fullText = '';
-    
+
     // For streaming, we need to handle the response differently
     // This is a simplified version - in production, you'd use event-stream parsing
     try {
       const data = response.data;
-      
+
       // If it's already parsed JSON (non-streaming case)
       if (data.output && data.output[0]) {
         fullText = data.output[0].content?.[0]?.text || '';
@@ -95,7 +95,7 @@ async function handleStreamingResponse(response) {
  */
 async function generateSummary(promptText, options = {}) {
   const apiKey = process.env.VOLCENGINE_API_KEY
-  
+
   if (!apiKey) {
     throw new Error('VOLCENGINE_API_KEY environment variable is not set');
   }
@@ -107,7 +107,7 @@ async function generateSummary(promptText, options = {}) {
     }
   ];
 
-  return await callVolcengineAI(apiKey, 'deepseek-v3-2-251201', messages, options);
+  return await callVolcengineAI(apiKey, 'deepseek-v4-flash-260425', messages, options);
 }
 
 
