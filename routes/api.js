@@ -59,6 +59,7 @@ const getPromptText = async (req) => {
     }
   }
 
+
   // If content exceeds 50000 chars, rebuild with only commit messages (no diff)
   if (content.length > 50000) {
     console.log('Commit content exceeds 100000 chars, rebuilding with only commit messages');
@@ -73,6 +74,8 @@ const getPromptText = async (req) => {
   } else {
     console.log('Commit content is within 100000 chars, using full content');
   }
+
+  console.log('Commit content:', content);
 
   // Save to temporary files
   const tempFile = path.join(__dirname, '../temp_commits.txt');

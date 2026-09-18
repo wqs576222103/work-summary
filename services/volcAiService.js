@@ -3,12 +3,12 @@ const axios = require('axios');
 /**
  * Call Volcengine Ark AI API with streaming support
  * @param {string} apiKey - Volcengine ARK API key
- * @param {string} model - Model name (default: deepseek-v4-flash-260425)
+ * @param {string} model - Model name 
  * @param {Array} messages - Array of message objects with role and content
  * @param {Object} options - Optional configuration (tools, stream, etc.)
  * @returns {Promise<string>} - Generated response text
  */
-async function callVolcengineAI(apiKey, model = 'deepseek-v4-flash-260425', messages, options = {}) {
+async function callVolcengineAI(apiKey, model = 'deepseek-v4-1-flash-260910', messages, options = {}) {
   try {
     const baseUrl = process.env.VOLCENGINE_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3';
 
@@ -107,7 +107,7 @@ async function generateSummary(promptText, options = {}) {
     }
   ];
 
-  return await callVolcengineAI(apiKey, 'deepseek-v4-flash-260425', messages, options);
+  return await callVolcengineAI(apiKey, 'deepseek-v4-1-flash-260910', messages, options);
 }
 
 
