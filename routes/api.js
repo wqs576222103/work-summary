@@ -1,11 +1,15 @@
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
 const router = express.Router();
 
-const { findGitRepos, getGitUsername, getRepoCommits } = require('../services/gitService');
+const {
+  findGitRepos,
+  getGitUsername,
+  getRepoCommits,
+} = require("../services/gitService");
 // const { generateSummary } = require('../services/aiService');
-const { generateSummary } = require('../services/volcAiService');
+const { generateSummary } = require("../services/volcAiService");
 
 // Helper function to convert string to array
 const str2Arr = (str, defaultValue = []) => {
@@ -14,7 +18,7 @@ const str2Arr = (str, defaultValue = []) => {
     if (Array.isArray(str)) {
       arr = str;
     } else {
-      arr = str.split(',').map(b => b.trim());
+      arr = str.split(",").map((b) => b.trim());
     }
   } else {
     arr = defaultValue;
@@ -29,28 +33,41 @@ const getPromptText = async (req) => {
   const { repos, branch, startDate, endDate, username } = req.body;
 
   if (!repos || !startDate || !endDate) {
-    throw new Error('Missing required parameters');
+    throw new Error("Missing required parameters");
   }
 
-  let branchesToProcess = str2Arr(branch, ['alpha', 'dev']);
+  let branchesToProcess = str2Arr(branch, ["alpha", "dev"]);
   const allCommits = [];
 
   // Collect commits from all repositories
   for (const repoPath of repos) {
     const repoName = path.basename(repoPath);
-    const commits = await getRepoCommits(repoPath, branchesToProcess, startDate, endDate, username);
+    const commits = await getRepoCommits(
+      repoPath,
+      branchesToProcess,
+      startDate,
+      endDate,
+      username,
+    );
 
     if (commits.length > 0) {
       allCommits.push({
         repoName,
         repoPath,
-        commits
+        commits,
       });
     }
   }
 
+  // No commits found: fail fast instead of asking AI with an empty prompt
+  if (allCommits.length === 0) {
+    throw new Error(
+      `未找到符合条件的提交记录（分支: ${branchesToProcess.join(", ")}，时间: ${startDate}~${endDate}，用户: ${username || "默认"}），请检查分支名称、日期范围或用户名`,
+    );
+  }
+
   // Format commits into a text file content
-  let content = '';
+  let content = "";
   for (const repo of allCommits) {
     content += `\n=== ${repo.repoName} ===\n\n`;
 
@@ -59,11 +76,12 @@ const getPromptText = async (req) => {
     }
   }
 
-
   // If content exceeds 50000 chars, rebuild with only commit messages (no diff)
   if (content.length > 50000) {
-    console.log('Commit content exceeds 100000 chars, rebuilding with only commit messages');
-    content = '';
+    console.log(
+      `Commit content is ${content.length} chars (>50000), rebuilding with only commit messages`,
+    );
+    content = "";
     for (const repo of allCommits) {
       content += `\n=== ${repo.repoName} ===\n\n`;
 
@@ -72,16 +90,12 @@ const getPromptText = async (req) => {
       }
     }
   } else {
-    console.log('Commit content is within 100000 chars, using full content');
+    console.log(
+      `Commit content is ${content.length} chars, using full content`,
+    );
   }
 
-  console.log('Commit content:', content);
-
-  // Save to temporary files
-  const tempFile = path.join(__dirname, '../temp_commits.txt');
-  const tempFilePrompt = path.join(__dirname, '../temp_commits_prompt.txt');
-
-  await fs.promises.writeFile(tempFile, content, 'utf-8');
+  console.log("Commit content:", content);
 
   const promptText = `
 请根据以下 Git 提交记录生成工作总结, 尽量简洁一点, 提交记录内容：
@@ -101,10 +115,9 @@ ${content}
 根据以上规则帮我总结一下当前项目的周报
 `;
 
-  await fs.promises.writeFile(tempFilePrompt, promptText, 'utf-8');
-
-  // Clean up temp file
-  await fs.promises.unlink(tempFile);
+  // Save prompt to a temp file for debugging
+  const tempFilePrompt = path.join(__dirname, "../temp_commits_prompt.txt");
+  await fs.promises.writeFile(tempFilePrompt, promptText, "utf-8");
 
   return { promptText, allCommits };
 };
@@ -113,12 +126,12 @@ ${content}
  * POST /api/scan
  * Scan directory for git repositories
  */
-router.post('/scan', async (req, res) => {
+router.post("/scan", async (req, res) => {
   try {
     const { dirPath } = req.body;
 
     if (!dirPath) {
-      return res.status(400).json({ error: 'Directory path is required' });
+      return res.status(400).json({ error: "Directory path is required" });
     }
 
     const dirPaths = str2Arr(dirPath, []);
@@ -129,7 +142,7 @@ router.post('/scan', async (req, res) => {
       const normalizedPath = path.normalize(_dirPath);
 
       if (!fs.existsSync(normalizedPath)) {
-        return res.status(400).json({ error: 'Directory does not exist' });
+        return res.status(400).json({ error: "Directory does not exist" });
       }
 
       const repoList = await findGitRepos(normalizedPath);
@@ -138,7 +151,7 @@ router.post('/scan', async (req, res) => {
 
     res.json({ repos });
   } catch (err) {
-    console.error('Error scanning directory:', err.message);
+    console.error("Error scanning directory:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -147,18 +160,18 @@ router.post('/scan', async (req, res) => {
  * POST /api/username
  * Get git username for a repository
  */
-router.post('/username', async (req, res) => {
+router.post("/username", async (req, res) => {
   try {
     const { repoPath } = req.body;
 
     if (!repoPath) {
-      return res.status(400).json({ error: 'Repository path is required' });
+      return res.status(400).json({ error: "Repository path is required" });
     }
 
     const username = await getGitUsername(repoPath);
     res.json({ username });
   } catch (err) {
-    console.error('Error getting username:', err.message);
+    console.error("Error getting username:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -167,8 +180,8 @@ router.post('/username', async (req, res) => {
  * POST /api/generate
  * Process repositories and generate summary
  */
-router.post('/generate', async (req, res) => {
-  let _promptText = '';
+router.post("/generate", async (req, res) => {
+  let _promptText = "";
 
   try {
     const { promptText, allCommits } = await getPromptText(req);
@@ -181,10 +194,13 @@ router.post('/generate', async (req, res) => {
 
     res.json({
       summary,
-      commitsCount: allCommits.reduce((sum, repo) => sum + repo.commits.length, 0)
+      commitsCount: allCommits.reduce(
+        (sum, repo) => sum + repo.commits.length,
+        0,
+      ),
     });
   } catch (err) {
-    console.error('Error generating summary:', err.message);
+    console.error("Error generating summary:", err.message);
     const error = `${err.message}\n${_promptText}`;
     res.status(500).json({ error });
   }

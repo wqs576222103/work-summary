@@ -253,7 +253,9 @@
       <div class="form-section">
         <div class="form-group">
           <label for="rootPath">根目录路径：</label>
-          <input type="text" id="rootPath" placeholder="例如：D:\projects 或 /home/user/projects">
+          <input type="text" id="rootPath" list="rootPathHistory"
+            placeholder="例如：D:\projects 或 /home/user/projects" autocomplete="off">
+          <datalist id="rootPathHistory"></datalist>
         </div>
 
         <button onclick="scanDirectory()" id="scanBtn">扫描项目</button>
@@ -333,9 +335,40 @@
       document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
     }
 
+    const ROOT_PATH_HISTORY_KEY = 'rootPathHistory';
+    const MAX_HISTORY = 10;
+
+    function getRootPathHistory() {
+      try {
+        const list = JSON.parse(localStorage.getItem(ROOT_PATH_HISTORY_KEY) || '[]');
+        return Array.isArray(list) ? list.filter(p => typeof p === 'string' && p) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function addRootPathHistory(path) {
+      const list = getRootPathHistory().filter(p => p !== path);
+      list.unshift(path);
+      localStorage.setItem(ROOT_PATH_HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY)));
+      renderRootPathHistory();
+    }
+
+    function renderRootPathHistory() {
+      const datalist = document.getElementById('rootPathHistory');
+      datalist.innerHTML = getRootPathHistory().map(p => `<option value="${escapeHtml(p)}"></option>`).join('');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
     function setRootPath() {
-      const rootPath = document.getElementById('rootPath')
-      rootPath.value = 'D:\\code';
+      const history = getRootPathHistory();
+      document.getElementById('rootPath').value = history[0] || 'D:\\code';
+      renderRootPathHistory();
     }
 
     setDefaultDates();
@@ -370,6 +403,7 @@
         if (response.ok) {
           discoveredRepos = data.repos;
           displayRepos(data.repos);
+          addRootPathHistory(rootPath);
           showStatus(statusDiv, `发现 ${data.repos.length} 个项目`, 'success');
           document.getElementById('generateSection').style.display = 'block';
         } else {
