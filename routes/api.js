@@ -135,7 +135,7 @@ router.post("/scan", async (req, res) => {
     }
 
     const dirPaths = str2Arr(dirPath, []);
-    const repos = [];
+    const repoSet = new Set();
 
     for (const _dirPath of dirPaths) {
       // Normalize path for Windows
@@ -146,10 +146,10 @@ router.post("/scan", async (req, res) => {
       }
 
       const repoList = await findGitRepos(normalizedPath);
-      repos.push(...repoList);
+      repoList.forEach((repo) => repoSet.add(repo));
     }
 
-    res.json({ repos });
+    res.json({ repos: [...repoSet] });
   } catch (err) {
     console.error("Error scanning directory:", err.message);
     res.status(500).json({ error: err.message });
@@ -188,9 +188,9 @@ router.post("/generate", async (req, res) => {
     _promptText = promptText;
 
     // Generate summary using Claude
-    const summary = await generateSummary(promptText);
+    // const summary = await generateSummary(promptText);
     // 暂时不调用ai, 请复制以下提示词
-    // const summary = promptText
+    const summary = promptText;
 
     res.json({
       summary,

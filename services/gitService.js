@@ -5,41 +5,51 @@ const simpleGit = require("simple-git");
 // Store git username cache
 const gitUsernameCache = new Map();
 
+// Directories that never contain repositories worth reporting
+const SCAN_SKIP_DIRS = new Set([".git", "node_modules"]);
+
 /**
- * Find all git repositories in a directory
+ * Find all git repositories in a directory, including nested sub-repositories
  * @param {string} dirPath - Directory path to scan
  * @returns {Promise<string[]>} - Array of git repository paths
  */
 async function findGitRepos(dirPath) {
   const repos = [];
+  const seen = new Set();
 
   async function scanDir(currentPath) {
+    let items;
     try {
-      const items = await fs.promises.readdir(currentPath);
-
-      for (const item of items) {
-        const fullPath = path.join(currentPath, item);
-
-        try {
-          const stat = await fs.promises.stat(fullPath);
-
-          if (stat.isDirectory()) {
-            // Check if this is a .git directory
-            if (item === ".git") {
-              const repoPath = path.dirname(fullPath);
-              repos.push(repoPath);
-              return; // Don't go deeper
-            }
-
-            // Continue scanning subdirectories
-            await scanDir(fullPath);
-          }
-        } catch (err) {
-          // Skip inaccessible directories
-        }
-      }
+      items = await fs.promises.readdir(currentPath);
     } catch (err) {
       console.error(`Error scanning ${currentPath}:`, err.message);
+      return;
+    }
+
+    // .git may be a directory (normal repo) or a file (submodule/worktree)
+    if (items.includes(".git")) {
+      const repoPath = path.normalize(currentPath);
+      if (!seen.has(repoPath)) {
+        seen.add(repoPath);
+        repos.push(repoPath);
+      }
+    }
+
+    // Keep scanning inside the repo to find nested sub-repositories
+    for (const item of items) {
+      if (SCAN_SKIP_DIRS.has(item)) continue;
+
+      const fullPath = path.join(currentPath, item);
+
+      try {
+        const stat = await fs.promises.stat(fullPath);
+
+        if (stat.isDirectory()) {
+          await scanDir(fullPath);
+        }
+      } catch (err) {
+        // Skip inaccessible directories
+      }
     }
   }
 
