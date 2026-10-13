@@ -166,19 +166,27 @@ async function getRepoCommits(
 
     for (const { branch, ref } of branchesToProcess) {
       try {
-        const logArgs = [
-          ref,
-          `--since=${normalizeSince(startDate)}`,
-          `--until=${normalizeUntil(endDate)}`,
+        const logOptions = {
+          format: {
+            hash: "%H",
+            date: "%aI",
+            message: "%B",
+            refs: "%D",
+            author_name: "%aN",
+            author_email: "%aE",
+          },
+          [ref]: null,
+          "--since": normalizeSince(startDate),
+          "--until": normalizeUntil(endDate),
           // 过滤掉merge commit
-          `--no-merges`,
-        ];
+          "--no-merges": null,
+        };
         // Empty author pattern would filter out everything
         if (username) {
-          logArgs.push(`--author=${username}`);
+          logOptions["--author"] = username;
         }
 
-        const log = await git.log(logArgs);
+        const log = await git.log(logOptions);
 
         console.log(
           `Repo ${repoPath} branch ${ref}: ${log.all.length} commits (${startDate}~${endDate}, author=${username || "any"})`,
@@ -202,7 +210,7 @@ async function getRepoCommits(
 
             commits.push({
               hash: commit.hash,
-              message: commit.message,
+              message: String(commit.message || "").trim(),
               date: commit.date,
               author: commit.author_name,
               branch: branch,
