@@ -38,17 +38,25 @@ const getPromptText = async (req) => {
 
   let branchesToProcess = str2Arr(branch, ["alpha", "dev"]);
   const allCommits = [];
+  const seenHashes = new Set();
 
   // Collect commits from all repositories
   for (const repoPath of repos) {
     const repoName = path.basename(repoPath);
-    const commits = await getRepoCommits(
+    const rawCommits = await getRepoCommits(
       repoPath,
       branchesToProcess,
       startDate,
       endDate,
       username,
     );
+
+    // Deduplicate commits whose hash already collected (e.g. same repo listed twice)
+    const commits = rawCommits.filter((commit) => {
+      if (!commit.hash || seenHashes.has(commit.hash)) return false;
+      seenHashes.add(commit.hash);
+      return true;
+    });
 
     if (commits.length > 0) {
       allCommits.push({
@@ -105,7 +113,7 @@ const getPromptText = async (req) => {
 
   const extraNotesText =
     typeof extraNotes === "string" && extraNotes.trim()
-      ? `\n\n额外要求（请一并遵循）：\n${extraNotes.trim()}\n`
+      ? `\n\n额外说明：\n${extraNotes.trim()}\n`
       : "";
 
   const finalPromptText = promptText + extraNotesText;
