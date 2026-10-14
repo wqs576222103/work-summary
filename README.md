@@ -22,6 +22,7 @@
 ## 安装步骤
 
 1. 安装依赖：
+
 ```bash
 npm install
 ```
@@ -29,16 +30,19 @@ npm install
 2. 配置环境变量：
    - 复制 `.env.example` 为 `.env`
    - 在 `.env` 文件中填入你的 Anthropic API Key：
+
 ```
 ANTHROPIC_API_KEY=your_actual_api_key_here
 ```
 
 3. 启动服务器：
+
 ```bash
 npm start
 ```
 
 4. 打开浏览器访问：
+
 ```
 http://localhost:3000
 ```
@@ -55,8 +59,8 @@ http://localhost:3000
 
 4. **设置参数**：
    - 选择日期范围（开始日期和结束日期）
-   - 指定分支名称（可选，如：alpha、main、master）
-   - 输入 Git 用户名（可选，留空则使用仓库配置的用户名）
+   - 指定分支名称（可选，如：alpha、main、master、dev）
+   - 输入 Git 用户名（可选，留空则使用git config默认配置的用户名的用户名）
 
 5. **点击"生成总结"**：等待 AI 分析提交记录并生成总结
 
@@ -109,16 +113,19 @@ work-summary/
 ## 故障排除
 
 ### 扫描不到项目
+
 - 检查路径是否正确
 - 确保目标目录包含 `.git` 文件夹
 - 检查是否有目录读取权限
 
 ### 生成总结失败
+
 - 检查 API Key 是否正确配置
 - 确认网络连接正常
 - 检查所选项目在指定日期范围内是否有提交记录
 
 ### Git 操作错误
+
 - 确保系统已安装 Git
 - 检查 Git 配置中的用户名
 - 确认指定的分支存在

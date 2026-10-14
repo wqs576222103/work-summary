@@ -125,6 +125,11 @@
       box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
     }
 
+    .quick-btn.active {
+      background: #667eea;
+      color: white;
+    }
+
     button {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -312,12 +317,13 @@
 
       <div class="form-section" id="generateSection" style="display: none;">
         <div class="quick-range">
-          <span class="quick-range-label">快捷选择：</span>
+          <span class="quick-range-label">日期快捷选择：</span>
           <button type="button" class="quick-btn" onclick="setQuickRange('today')">当天</button>
           <button type="button" class="quick-btn" onclick="setQuickRange('week')">本周</button>
           <button type="button" class="quick-btn" onclick="setQuickRange('month')">本月</button>
           <button type="button" class="quick-btn" onclick="setQuickRange('d3')">最近三天</button>
           <button type="button" class="quick-btn" onclick="setQuickRange('d7')">最近七天</button>
+          <button type="button" class="quick-btn" onclick="setQuickRange('d30')">最近三十天</button>
         </div>
 
         <div class="date-range">
@@ -338,15 +344,14 @@
         </div>
 
         <div class="form-group">
-          <label for="username">Git 用户名（可选，留空则使用仓库配置）：</label>
+          <label for="username">Git 用户名（可选，留空则使用git config默认配置的用户名）：</label>
           <input type="text" id="username" list="usernameHistory" placeholder="留空则自动获取" autocomplete="off">
           <datalist id="usernameHistory"></datalist>
         </div>
         <!-- 额外说明 -->
         <div class="form-group">
           <label for="extraNotes">额外说明（可选，将拼接到生成提示词中）：</label>
-          <textarea id="extraNotes" list="extraNotesHistory" rows="4"
-            placeholder="例如：重点突出接口联调与联调问题修复；按模块分组输出"></textarea>
+          <textarea id="extraNotes" list="extraNotesHistory" rows="4" placeholder="例如：重点突出接口联调与联调问题修复；按模块分组输出"></textarea>
           <datalist id="extraNotesHistory"></datalist>
         </div>
 
@@ -397,6 +402,9 @@
       return `${y}-${m}-${d}`;
     }
 
+    const QUICK_RANGE_KEY = 'lastQuickRange';
+    const QUICK_RANGES = ['today', 'week', 'month', 'd3', 'd7', 'd30'];
+
     function setQuickRange(range) {
       const end = new Date();
       const start = new Date(end);
@@ -410,10 +418,37 @@
         start.setDate(end.getDate() - 2);
       } else if (range === 'd7') {
         start.setDate(end.getDate() - 6);
+      } else if (range === 'd30') {
+        start.setDate(end.getDate() - 29);
       }
 
       document.getElementById('startDate').value = formatDate(start);
       document.getElementById('endDate').value = formatDate(end);
+
+      try {
+        localStorage.setItem(QUICK_RANGE_KEY, range);
+      } catch (e) {}
+      highlightQuickRange(range);
+    }
+
+    function highlightQuickRange(range) {
+      document.querySelectorAll('.quick-btn').forEach(btn => {
+        const active = btn.getAttribute('onclick') === `setQuickRange('${range}')`;
+        btn.classList.toggle('active', active);
+      });
+    }
+
+    function restoreQuickRange() {
+      let range = '';
+      try {
+        range = localStorage.getItem(QUICK_RANGE_KEY) || '';
+      } catch (e) {}
+
+      if (QUICK_RANGES.includes(range)) {
+        setQuickRange(range);
+      } else {
+        highlightQuickRange('');
+      }
     }
 
     const HISTORY_KEYS = {
@@ -423,6 +458,18 @@
       extraNotes: 'extraNotesHistory'
     };
     const MAX_HISTORY = 10;
+
+    const DEFAULT_EXTRA_NOTES = `请根据 Git 提交记录生成工作总结，尽量简洁一点，提交记录内容，按照以下格式输出：
+日期 YYYY-MM-DD ~ YYYY-MM-DD 的工作总结：
+规则：
+1. 需求统计置顶：第一句话必须用 本周需求修改合计【】项：开发阶段新页面【】项；测试阶段 bug 修复【】项；验收运维阶段业主需求【】项、沟通对齐类需求【】项。的格式
+✅**主要需求（逐条单独写，都是页面 / 核心模块开发、复杂业务逻辑，必须列出）**
+✅**次要需求（收敛打包，字段显隐、加 loading、文案调整、简单样式微调这类，统一放末尾“等 XX 项简单优化需求”，不再逐个列**
+模板示例
+本周前端主要完成：
+1. 开发【板坯库存可视化页面】，完成页面搭建与接口联调（进度 100%）
+2. 开发【退货入库单据页面】，实现单据查询、详情弹窗业务逻辑（进度 85%）
+3. 完成【强制离库操作模块】权限与按钮禁用逻辑开发（进度 100%）`;
 
     function getHistory(key) {
       try {
@@ -477,12 +524,14 @@
     function restoreFieldHistory() {
       ['branch', 'username', 'extraNotes'].forEach(key => {
         const history = getHistory(HISTORY_KEYS[key]);
-        document.getElementById(key).value = history[0] || '';
+        const fallback = key === 'extraNotes' ? DEFAULT_EXTRA_NOTES : '';
+        document.getElementById(key).value = history[0] || fallback;
         renderHistory(HISTORY_KEYS[key]);
       });
     }
 
     setDefaultDates();
+    restoreQuickRange();
     setRootPath();
     restoreFieldHistory();
     async function scanDirectory() {
