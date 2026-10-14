@@ -66,16 +66,23 @@
 
     input[type="text"],
     input[type="date"],
+    textarea,
     select {
       width: 100%;
       padding: 12px;
       border: 2px solid #e0e0e0;
       border-radius: 6px;
       font-size: 14px;
+      font-family: inherit;
       transition: border-color 0.3s;
     }
 
+    textarea {
+      resize: vertical;
+    }
+
     input:focus,
+    textarea:focus,
     select:focus {
       outline: none;
       border-color: #667eea;
@@ -336,6 +343,12 @@
           <datalist id="usernameHistory"></datalist>
         </div>
         <!-- 额外说明 -->
+        <div class="form-group">
+          <label for="extraNotes">额外说明（可选，将拼接到生成提示词中）：</label>
+          <textarea id="extraNotes" list="extraNotesHistory" rows="4"
+            placeholder="例如：重点突出接口联调与联调问题修复；按模块分组输出"></textarea>
+          <datalist id="extraNotesHistory"></datalist>
+        </div>
 
         <button onclick="generateSummary()" id="generateBtn">生成总结</button>
 
@@ -406,7 +419,8 @@
     const HISTORY_KEYS = {
       rootPath: 'rootPathHistory',
       branch: 'branchHistory',
-      username: 'usernameHistory'
+      username: 'usernameHistory',
+      extraNotes: 'extraNotesHistory'
     };
     const MAX_HISTORY = 10;
 
@@ -461,7 +475,7 @@
     }
 
     function restoreFieldHistory() {
-      ['branch', 'username'].forEach(key => {
+      ['branch', 'username', 'extraNotes'].forEach(key => {
         const history = getHistory(HISTORY_KEYS[key]);
         document.getElementById(key).value = history[0] || '';
         renderHistory(HISTORY_KEYS[key]);
@@ -572,6 +586,7 @@
       const endDate = document.getElementById('endDate').value;
       const branch = document.getElementById('branch').value.trim();
       const username = document.getElementById('username').value.trim();
+      const extraNotes = document.getElementById('extraNotes').value.trim();
 
       if (!startDate || !endDate) {
         showStatus(document.getElementById('generateStatus'), '请选择日期范围', 'error');
@@ -594,7 +609,8 @@
             branch,
             startDate,
             endDate,
-            username: username || null
+            username: username || null,
+            extraNotes: extraNotes || null
           })
         });
 
@@ -603,6 +619,7 @@
         if (response.ok) {
           if (branch) addHistory(HISTORY_KEYS.branch, branch);
           if (username) addHistory(HISTORY_KEYS.username, username);
+          if (extraNotes) addHistory(HISTORY_KEYS.extraNotes, extraNotes);
           generatedResult = data.summary;
           document.getElementById('resultContent').textContent = data.summary;
           document.getElementById('processedRepos').textContent = selectedRepos.length;
