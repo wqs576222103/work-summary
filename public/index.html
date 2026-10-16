@@ -319,6 +319,7 @@
       <div class="form-section" id="generateSection" style="display: none;">
         <div class="quick-range">
           <span class="quick-range-label">日期快捷选择：</span>
+          <button type="button" class="quick-btn" onclick="setQuickRange('weekly')">本周周报</button>
           <button type="button" class="quick-btn" onclick="setQuickRange('today')">当天</button>
           <button type="button" class="quick-btn" onclick="setQuickRange('week')">本周</button>
           <button type="button" class="quick-btn" onclick="setQuickRange('month')">本月</button>
@@ -409,26 +410,33 @@
     }
 
     const QUICK_RANGE_KEY = 'lastQuickRange';
-    const QUICK_RANGES = ['today', 'week', 'month', 'd3', 'd7', 'd30'];
+    const QUICK_RANGES = ['weekly', 'today', 'week', 'month', 'd3', 'd7', 'd30'];
 
     function setQuickRange(range) {
       const end = new Date();
       const start = new Date(end);
 
-      if (range === 'week') {
-        const day = (end.getDay() + 6) % 7;
-        start.setDate(end.getDate() - day);
-      } else if (range === 'month') {
-        start.setDate(1);
-      } else if (range === 'd3') {
-        start.setDate(end.getDate() - 2);
-      } else if (range === 'd7') {
-        start.setDate(end.getDate() - 6);
-      } else if (range === 'd30') {
-        start.setDate(end.getDate() - 29);
+      if (range === 'weekly') {
+        // 本周周报：上周五 16:30 到当天；当天是周五则取上一个周五
+        let daysSinceFriday = (end.getDay() - 5 + 7) % 7;
+        if (daysSinceFriday === 0) daysSinceFriday = 7;
+        start.setDate(end.getDate() - daysSinceFriday);
+        start.setHours(16, 30, 0, 0);
+      } else {
+        if (range === 'week') {
+          const day = (end.getDay() + 6) % 7;
+          start.setDate(end.getDate() - day);
+        } else if (range === 'month') {
+          start.setDate(1);
+        } else if (range === 'd3') {
+          start.setDate(end.getDate() - 2);
+        } else if (range === 'd7') {
+          start.setDate(end.getDate() - 6);
+        } else if (range === 'd30') {
+          start.setDate(end.getDate() - 29);
+        }
+        start.setHours(0, 0, 0, 0);
       }
-
-      start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 0);
 
       document.getElementById('startDate').value = formatDate(start);
