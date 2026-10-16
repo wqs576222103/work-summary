@@ -66,6 +66,7 @@
 
     input[type="text"],
     input[type="date"],
+    input[type="datetime-local"],
     textarea,
     select {
       width: 100%;
@@ -329,11 +330,11 @@
         <div class="date-range">
           <div class="form-group">
             <label for="startDate">开始日期：</label>
-            <input type="date" id="startDate">
+            <input type="datetime-local" id="startDate" step="1">
           </div>
           <div class="form-group">
             <label for="endDate">结束日期：</label>
-            <input type="date" id="endDate">
+            <input type="datetime-local" id="endDate" step="1">
           </div>
         </div>
 
@@ -385,11 +386,13 @@
     let discoveredRepos = [];
     let generatedResult = '';
 
-    // Set default date range (last 7 days)
+    // Set default date range (last 7 days): start 00:00:00, end 23:59:59
     function setDefaultDates() {
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 0);
 
       document.getElementById('endDate').value = formatDate(endDate);
       document.getElementById('startDate').value = formatDate(startDate);
@@ -399,7 +402,10 @@
       const y = date.getFullYear();
       const m = String(date.getMonth() + 1).padStart(2, '0');
       const d = String(date.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
+      const hh = String(date.getHours()).padStart(2, '0');
+      const mm = String(date.getMinutes()).padStart(2, '0');
+      const ss = String(date.getSeconds()).padStart(2, '0');
+      return `${y}-${m}-${d}T${hh}:${mm}:${ss}`;
     }
 
     const QUICK_RANGE_KEY = 'lastQuickRange';
@@ -422,12 +428,16 @@
         start.setDate(end.getDate() - 29);
       }
 
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 0);
+
       document.getElementById('startDate').value = formatDate(start);
       document.getElementById('endDate').value = formatDate(end);
 
       try {
         localStorage.setItem(QUICK_RANGE_KEY, range);
       } catch (e) {}
+      saveDateRange(range);
       highlightQuickRange(range);
     }
 
@@ -449,6 +459,33 @@
       } else {
         highlightQuickRange('');
       }
+    }
+
+    const DATE_RANGE_KEY = 'lastDateRange';
+
+    function saveDateRange(range) {
+      try {
+        localStorage.setItem(DATE_RANGE_KEY, JSON.stringify({
+          start: document.getElementById('startDate').value,
+          end: document.getElementById('endDate').value,
+          range: range || ''
+        }));
+      } catch (e) {}
+    }
+
+    function restoreDateRange() {
+      let cached = null;
+      try {
+        cached = JSON.parse(localStorage.getItem(DATE_RANGE_KEY) || 'null');
+      } catch (e) {}
+
+      const isDtValue = v => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(v || '');
+      if (!cached || !isDtValue(cached.start) || !isDtValue(cached.end)) return false;
+
+      document.getElementById('startDate').value = cached.start;
+      document.getElementById('endDate').value = cached.end;
+      highlightQuickRange(QUICK_RANGES.includes(cached.range) ? cached.range : '');
+      return true;
     }
 
     const HISTORY_KEYS = {
@@ -531,9 +568,18 @@
     }
 
     setDefaultDates();
-    restoreQuickRange();
+    if (!restoreDateRange()) {
+      restoreQuickRange();
+    }
     setRootPath();
     restoreFieldHistory();
+
+    ['startDate', 'endDate'].forEach(id => {
+      document.getElementById(id).addEventListener('change', () => {
+        saveDateRange('');
+        highlightQuickRange('');
+      });
+    });
     async function scanDirectory() {
       const rootPath = document.getElementById('rootPath').value.trim();
       const scanBtn = document.getElementById('scanBtn');
@@ -639,6 +685,11 @@
 
       if (!startDate || !endDate) {
         showStatus(document.getElementById('generateStatus'), '请选择日期范围', 'error');
+        return;
+      }
+
+      if (startDate > endDate) {
+        showStatus(document.getElementById('generateStatus'), '开始时间不能晚于结束时间', 'error');
         return;
       }
 

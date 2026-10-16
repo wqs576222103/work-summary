@@ -101,8 +101,8 @@ async function getGitUsername(repoPath) {
  * Get commits for a repository in a date range
  * @param {string} repoPath - Repository path
  * @param {string|string[]} branches - Branch name or array of branch names
- * @param {string} startDate - Start date (YYYY-MM-DD)
- * @param {string} endDate - End date (YYYY-MM-DD)
+ * @param {string} startDate - Start date (YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS])
+ * @param {string} endDate - End date (YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS])
  * @param {string} username - Git username to filter
  * @returns {Promise<Object[]>} - Array of commit objects
  */
@@ -264,25 +264,40 @@ function resolveBranchRef(branch, refNames, remoteNames) {
 
 /**
  * Normalize a start date for git --since
- * Git parses a bare YYYY-MM-DD unreliably, always append 00:00:00
- * @param {string} date - Start date (YYYY-MM-DD)
+ * Git parses a bare YYYY-MM-DD unreliably, always expand to a full datetime.
+ * Accepts YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS] (datetime-local input format)
+ * @param {string} date - Start date
  * @returns {string}
  */
 function normalizeSince(date) {
-  const d = String(date || "").trim();
-  if (!d) return d;
-  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d} 00:00:00` : d;
+  return normalizeDateTimeBound(date, "00:00:00", ":00");
 }
 
 /**
  * Normalize an end date for git --until
- * @param {string} date - End date (YYYY-MM-DD)
+ * Git parses a bare YYYY-MM-DD unreliably, always expand to a full datetime.
+ * Accepts YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS] (datetime-local input format)
+ * @param {string} date - End date
  * @returns {string}
  */
 function normalizeUntil(date) {
+  return normalizeDateTimeBound(date, "23:59:59", ":59");
+}
+
+/**
+ * Convert a date/datetime string to "YYYY-MM-DD HH:MM:SS" for git --since/--until
+ * @param {string} date - YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS]
+ * @param {string} defaultTime - Time used when the value has only a date part
+ * @param {string} missingSeconds - Seconds appended when time has no seconds
+ * @returns {string}
+ */
+function normalizeDateTimeBound(date, defaultTime, missingSeconds) {
   const d = String(date || "").trim();
   if (!d) return d;
-  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d} 23:59:59` : d;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return `${d} ${defaultTime}`;
+  const m = d.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(:\d{2})?$/);
+  if (m) return `${m[1]} ${m[2]}${m[3] || missingSeconds}`;
+  return d;
 }
 
 /**
