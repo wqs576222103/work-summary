@@ -319,13 +319,14 @@
       <div class="form-section" id="generateSection" style="display: none;">
         <div class="quick-range">
           <span class="quick-range-label">日期快捷选择：</span>
-          <button type="button" class="quick-btn" onclick="setQuickRange('weekly')">本周周报</button>
-          <button type="button" class="quick-btn" onclick="setQuickRange('today')">当天</button>
-          <button type="button" class="quick-btn" onclick="setQuickRange('week')">本周</button>
-          <button type="button" class="quick-btn" onclick="setQuickRange('month')">本月</button>
-          <button type="button" class="quick-btn" onclick="setQuickRange('d3')">最近三天</button>
-          <button type="button" class="quick-btn" onclick="setQuickRange('d7')">最近七天</button>
-          <button type="button" class="quick-btn" onclick="setQuickRange('d30')">最近三十天</button>
+          <button type="button" class="quick-btn" data-range="weekly" onclick="setQuickRange('weekly')">本周周报</button>
+          <button type="button" class="quick-btn" data-range="today" onclick="setQuickRange('today')">当天</button>
+          <button type="button" class="quick-btn" data-range="week" onclick="setQuickRange('week')">本周</button>
+          <button type="button" class="quick-btn" data-range="month" onclick="setQuickRange('month')">本月</button>
+          <button type="button" class="quick-btn" data-range="d3" onclick="setQuickRange('d3')">最近三天</button>
+          <button type="button" class="quick-btn" data-range="d7" onclick="setQuickRange('d7')">最近七天</button>
+          <button type="button" class="quick-btn" data-range="d30" onclick="setQuickRange('d30')">最近三十天</button>
+          <button type="button" class="quick-btn" data-range="custom" onclick="selectCustomRange()">自定义时间</button>
         </div>
 
         <div class="date-range">
@@ -410,7 +411,7 @@
     }
 
     const QUICK_RANGE_KEY = 'lastQuickRange';
-    const QUICK_RANGES = ['weekly', 'today', 'week', 'month', 'd3', 'd7', 'd30'];
+    const QUICK_RANGES = ['weekly', 'today', 'week', 'month', 'd3', 'd7', 'd30', 'custom'];
 
     function setQuickRange(range) {
       const end = new Date();
@@ -451,9 +452,16 @@
 
     function highlightQuickRange(range) {
       document.querySelectorAll('.quick-btn').forEach(btn => {
-        const active = btn.getAttribute('onclick') === `setQuickRange('${range}')`;
-        btn.classList.toggle('active', active);
+        btn.classList.toggle('active', btn.getAttribute('data-range') === range);
       });
+    }
+
+    function selectCustomRange() {
+      try {
+        localStorage.setItem(QUICK_RANGE_KEY, 'custom');
+      } catch (e) {}
+      saveDateRange('custom');
+      highlightQuickRange('custom');
     }
 
     function restoreQuickRange() {
@@ -462,7 +470,9 @@
         range = localStorage.getItem(QUICK_RANGE_KEY) || '';
       } catch (e) {}
 
-      if (QUICK_RANGES.includes(range)) {
+      if (range === 'custom') {
+        highlightQuickRange('custom');
+      } else if (QUICK_RANGES.includes(range)) {
         setQuickRange(range);
       } else {
         highlightQuickRange('');
@@ -487,12 +497,22 @@
         cached = JSON.parse(localStorage.getItem(DATE_RANGE_KEY) || 'null');
       } catch (e) {}
 
+      if (!cached) return false;
+
+      const range = QUICK_RANGES.includes(cached.range) ? cached.range : '';
+
+      // 快捷选项：不使用缓存的具体时间，而是按当前时间重新计算
+      if (range && range !== 'custom') {
+        setQuickRange(range);
+        return true;
+      }
+
       const isDtValue = v => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(v || '');
-      if (!cached || !isDtValue(cached.start) || !isDtValue(cached.end)) return false;
+      if (!isDtValue(cached.start) || !isDtValue(cached.end)) return false;
 
       document.getElementById('startDate').value = cached.start;
       document.getElementById('endDate').value = cached.end;
-      highlightQuickRange(QUICK_RANGES.includes(cached.range) ? cached.range : '');
+      highlightQuickRange(range);
       return true;
     }
 
@@ -584,8 +604,7 @@
 
     ['startDate', 'endDate'].forEach(id => {
       document.getElementById(id).addEventListener('change', () => {
-        saveDateRange('');
-        highlightQuickRange('');
+        selectCustomRange();
       });
     });
     async function scanDirectory() {
